@@ -1,0 +1,89 @@
+#include <stdio.h>
+#include <stdlib.h>
+
+// Structure for items
+typedef struct {
+    int value, weight;
+} Item;
+
+// Global variable for Backtracking
+int maxProfitBT = 0;
+
+// Backtracking Function
+void knapsackBacktracking(Item items[], int n, int W, int idx, int currWeight, int currValue) {
+    if (idx == n || currWeight > W) {
+        if (currWeight <= W && currValue > maxProfitBT)
+            maxProfitBT = currValue;
+        return;
+    }
+    knapsackBacktracking(items, n, W, idx + 1, currWeight + items[idx].weight, currValue + items[idx].value);
+    knapsackBacktracking(items, n, W, idx + 1, currWeight, currValue);
+}
+
+// Comparator for value-to-weight ratio (for Branch & Bound)
+int compare(const void* a, const void* b) {
+    double r1 = (double)((Item*)a)->value / ((Item*)a)->weight;
+    double r2 = (double)((Item*)b)->value / ((Item*)b)->weight;
+    return r1 < r2 ? 1 : -1;
+}
+
+// Branch & Bound Function
+int knapsackBranchAndBound(Item items[], int n, int W) {
+    qsort(items, n, sizeof(Item), compare);
+    int maxProfit = 0, front = 0, rear = 0;
+    struct { int level, value, weight; float bound; } queue[1000], u, v;
+
+    queue[rear++] = (typeof(queue[0])){ -1, 0, 0, 0 };
+
+    while (front < rear) {
+        u = queue[front++];
+        if (u.level == n - 1) continue;
+
+        v.level = u.level + 1;
+        v.weight = u.weight + items[v.level].weight;
+        v.value = u.value + items[v.level].value;
+
+        if (v.weight <= W && v.value > maxProfit) maxProfit = v.value;
+        if ((v.bound = v.value + (W - v.weight) * (double)items[v.level + 1].value / items[v.level + 1].weight) > maxProfit)
+            queue[rear++] = v;
+
+        v.weight = u.weight;
+        v.value = u.value;
+        if ((v.bound = v.value + (W - v.weight) * (double)items[v.level + 1].value / items[v.level + 1].weight) > maxProfit)
+            queue[rear++] = v;
+    }
+
+    return maxProfit;
+}
+
+// Dynamic Programming Function
+int knapsackDP(Item items[], int n, int W) {
+    int dp[n + 1][W + 1];
+    for (int i = 0; i <= n; i++) {
+        for (int w = 0; w <= W; w++) {
+            if (i == 0 || w == 0) dp[i][w] = 0;
+            else if (items[i - 1].weight <= w)
+                dp[i][w] = (items[i - 1].value + dp[i - 1][w - items[i - 1].weight] > dp[i - 1][w])
+                           ? items[i - 1].value + dp[i - 1][w - items[i - 1].weight] : dp[i - 1][w];
+            else dp[i][w] = dp[i - 1][w];
+        }
+    }
+    return dp[n][W];
+}
+
+int main() {
+    Item items[] = { {60, 10}, {100, 20}, {120, 30}, {40, 40} };
+    int n = sizeof(items) / sizeof(items[0]), W = 50;
+
+    // Backtracking
+    knapsackBacktracking(items, n, W, 0, 0, 0);
+    printf("Backtracking Result: %d\n", maxProfitBT);
+
+    // Branch & Bound
+    printf("Branch & Bound Result: %d\n", knapsackBranchAndBound(items, n, W));
+
+    // Dynamic Programming
+    printf("Dynamic Programming Result: %d\n", knapsackDP(items, n, W));
+
+    return 0;
+}
